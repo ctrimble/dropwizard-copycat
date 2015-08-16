@@ -1,0 +1,28 @@
+logging:
+  level: INFO
+  loggers:
+    'org.dropwizard.copycat.example': DEBUG
+  appenders:
+    - type: 'console'
+
+server:
+  applicationConnectors:
+  - type: http
+    port: 8280
+  adminConnectors:
+  - type: http
+    port: 8281
+  shutdownGracePeriod: 2s
+
+copycat:
+  memberId: 2
+  members:
+    - id: 1
+      host: localhost
+      port: 9100
+    - id: 2
+      host: localhost
+      port: 9200
+    - id: 3
+      host: localhost
+      port: 9300

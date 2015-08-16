@@ -1,0 +1,13 @@
+logging:
+  level: INFO
+  loggers:
+    'org.dropwizard.copycat.example': DEBUG
+  appenders:
+    - type: 'console'
+
+copycat:
+  memberId: 1
+  members:
+    - id: 1
+      host: localhost
+      port: 3000
