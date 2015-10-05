@@ -23,7 +23,7 @@ import com.google.inject.AbstractModule;
 import com.google.inject.Provides;
 
 import io.dropwizard.Configuration;
-import net.kuujo.copycat.Copycat;
+import io.atomix.copycat.server.CopycatServer;
 
 public class CopycatModule extends AbstractModule {
 
@@ -38,8 +38,8 @@ public class CopycatModule extends AbstractModule {
   }
   
   @Provides
-  public Supplier<Copycat> copycat() {
-	  return bundle::getCopycat;
+  public Supplier<CopycatServer> server() {
+	  return bundle::getServer;
   }
 
 }

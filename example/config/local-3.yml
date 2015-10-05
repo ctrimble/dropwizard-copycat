@@ -15,14 +15,14 @@ server:
   shutdownGracePeriod: 2s
 
 copycat:
-  memberId: 3
+  address:
+    host: localhost
+    port: 9300
   members:
-    - id: 1
-      host: localhost
+    - host: localhost
       port: 9100
-    - id: 2
-      host: localhost
+    - host: localhost
       port: 9200
-    - id: 3
-      host: localhost
+    - host: localhost
       port: 9300
+  log: logs/node3

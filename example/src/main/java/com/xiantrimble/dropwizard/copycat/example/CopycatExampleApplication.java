@@ -21,15 +21,16 @@ import com.xiantrimble.dropwizard.copycat.guice.CopycatModule;
 import java.util.function.Supplier;
 
 import javax.inject.Inject;
+import javax.inject.Singleton;
 
 import com.google.inject.Stage;
 import com.hubspot.dropwizard.guice.GuiceBundle;
 
+import io.atomix.copycat.server.CopycatServer;
 import io.dropwizard.Application;
 import io.dropwizard.lifecycle.Managed;
 import io.dropwizard.setup.Bootstrap;
 import io.dropwizard.setup.Environment;
-import net.kuujo.copycat.Copycat;
 
 /**
  * copycat-example entry point
@@ -58,7 +59,8 @@ public class CopycatExampleApplication extends Application<CopycatExampleConfigu
   public void initialize(Bootstrap<CopycatExampleConfiguration> bootstrap) {
     bootstrap.addBundle(bundle =
         CopycatBundle.<CopycatExampleConfiguration> builder()
-            .withConfiguration(CopycatExampleConfiguration::getCopycat).build());
+            .withConfiguration(CopycatExampleConfiguration::getCopycat)
+            .withStateMachineSupplier(ExampleStateMachine::new).build());
 
     GuiceBundle.Builder<CopycatExampleConfiguration> builder =
         GuiceBundle.<CopycatExampleConfiguration> newBuilder()
@@ -77,24 +79,23 @@ public class CopycatExampleApplication extends Application<CopycatExampleConfigu
   @Override
   public void run(CopycatExampleConfiguration configuration, Environment environment)
       throws Exception {
-		 
   }
   
+  @Singleton
   public static class CompucationManaged implements Managed {
 	  
 	  @Inject
-	  Supplier<Copycat> copycat;
-	  
-	  Computation computation;
+	  Supplier<CopycatServer> copycat;
 
 		@Override
 		public void start() throws Exception {
-			computation = copycat.get().create("/computation", Computation.class).get();
+			System.out.println("starting computation");
+			//computation = copycat.get()..create("/computation", Computation.class).get();
 		}
 
 		@Override
 		public void stop() throws Exception {
-			
+			System.out.println("stopping computation");
 		}
   }
 }

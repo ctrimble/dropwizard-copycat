@@ -16,43 +16,49 @@
 package com.xiantrimble.dropwizard.copycat;
 
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 import io.dropwizard.Configuration;
 import io.dropwizard.ConfiguredBundle;
 import io.dropwizard.lifecycle.Managed;
 import io.dropwizard.setup.Bootstrap;
 import io.dropwizard.setup.Environment;
-import net.kuujo.copycat.Copycat;
-import net.kuujo.copycat.CopycatServer;
-
-;
+import io.atomix.copycat.server.CopycatServer;
+import io.atomix.copycat.server.StateMachine;
 
 public class CopycatBundle<C extends Configuration> implements ConfiguredBundle<C> {
 
   public static class Builder<C extends Configuration> {
 
     private Function<C, CopycatConfiguration> configuration;
+	private Supplier<StateMachine> stateMachineSupplier;
 
     public CopycatBundle<C> build() {
     	if( configuration == null ) {
     		throw new IllegalArgumentException("configuraiton accessor is required.");
     	}
-      return new CopycatBundle<C>(configuration);
+      return new CopycatBundle<C>(configuration, stateMachineSupplier);
     }
 
     public Builder<C> withConfiguration(Function<C, CopycatConfiguration> configuration) {
       this.configuration = configuration;
       return this;
     }
+    
+    public Builder<C> withStateMachineSupplier( Supplier<StateMachine> stateMachineSupplier ) {
+    	this.stateMachineSupplier = stateMachineSupplier;
+    	return this;
+    }
   }
 
   private Function<C, CopycatConfiguration> configurationAccessor;
   private CopycatConfiguration configuration;
   CopycatServer server;
-  Copycat copycat;
+  private Supplier<StateMachine> stateMachineSupplier;
 
-  public CopycatBundle(Function<C, CopycatConfiguration> configurationAccessor) {
+  public CopycatBundle(Function<C, CopycatConfiguration> configurationAccessor, Supplier<StateMachine> stateMachineSupplier) {
 	this.configurationAccessor = configurationAccessor;
+	this.stateMachineSupplier = stateMachineSupplier;
   }
 
   @Override
@@ -67,17 +73,13 @@ public class CopycatBundle<C extends Configuration> implements ConfiguredBundle<
     if( configuration == null ) {
     	throw new NullPointerException("configuration cannot be null.");
     }
-    server = configuration.createServer();
+    server = configuration.createServer(stateMachineSupplier);
     System.out.println("Managing server");
     environment.lifecycle().manage(new CopycatServerManager());
   }
 
   public CopycatServer getServer() {
     return server;
-  }
-  
-  public Copycat getCopycat() {
-	  return copycat;
   }
 
   public static <C extends Configuration> Builder<C> builder() {
@@ -89,11 +91,12 @@ public class CopycatBundle<C extends Configuration> implements ConfiguredBundle<
 	@Override
 	public void start() throws Exception {
 		System.out.println("starting copycat");
-		copycat = server.open().get();
+		server.open().get();
 	}
 
 	@Override
 	public void stop() throws Exception {
+		System.out.println("stopping copycat");
 		if( server != null ) {
 			server.close().get();
 		}

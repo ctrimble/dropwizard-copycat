@@ -43,19 +43,32 @@
         <optional>true</optional>
       </dependency>
       <dependency>
-          <groupId>net.kuujo.copycat</groupId>
-          <artifactId>copycat</artifactId>
+        <groupId>io.atomix.copycat</groupId>
+        <artifactId>copycat-server</artifactId>
         <version>${copycat.version}</version>
       </dependency>
       <dependency>
-        <groupId>net.kuujo.copycat</groupId>
-        <artifactId>copycat-coordination</artifactId>
+        <groupId>io.atomix.copycat</groupId>
+        <artifactId>copycat-client</artifactId>
         <version>${copycat.version}</version>
       </dependency>
       <dependency>
-          <groupId>net.kuujo.copycat</groupId>
-          <artifactId>copycat-netty</artifactId>
-          <version>${copycat.version}</version>
+        <groupId>io.atomix.copycat</groupId>
+        <artifactId>copycat-protocol</artifactId>
+        <version>${copycat.version}</version>
       </dependency>
-  </dependencies>
+      <dependency>
+        <groupId>io.atomix.catalyst</groupId>
+        <artifactId>catalyst-netty</artifactId>
+        <version>${catalyst.version}</version>
+      </dependency>
+
+
+      <dependency>
+    <groupId>commons-io</groupId>
+    <artifactId>commons-io</artifactId>
+    <version>2.4</version>
+    <scope>test</scope>
+</dependency>
+    </dependencies>
 </project>

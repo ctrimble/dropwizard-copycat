@@ -15,55 +15,84 @@
  */
 package com.xiantrimble.dropwizard.copycat;
 
+import java.io.File;
 import java.util.List;
-import net.kuujo.copycat.CopycatServer;
-import net.kuujo.copycat.io.storage.Log;
-import net.kuujo.copycat.io.storage.StorageLevel;
-import net.kuujo.copycat.io.transport.NettyTransport;
-import net.kuujo.copycat.raft.Member;
-import net.kuujo.copycat.raft.Members;
+import java.util.function.Supplier;
+
+import io.atomix.catalyst.transport.Address;
+import io.atomix.catalyst.transport.NettyTransport;
+import io.atomix.catalyst.transport.Transport;
+import io.atomix.copycat.server.CopycatServer;
+import io.atomix.copycat.server.StateMachine;
+import io.atomix.copycat.server.storage.Storage;
 
 public class CopycatConfiguration {
-  protected int memberId;
-  protected List<MemberConfiguration> members;
-
-  public int getMemberId() {
-    return memberId;
+protected HostAndPort address;
+  protected List<HostAndPort> members;
+  protected String log;
+  
+  public void setAddress( HostAndPort address ) {
+	  this.address = address;
+  }
+  
+  public HostAndPort getAddress() {
+	  return address;
   }
 
-  public void setMemberId(int memberId) {
-    this.memberId = memberId;
-  }
-
-  public List<MemberConfiguration> getMembers() {
+  public List<HostAndPort> getMembers() {
     return members;
   }
 
-  public void setMembers(List<MemberConfiguration> members) {
+  public void setMembers(List<HostAndPort> members) {
     this.members = members;
   }
+  
+  public String getLog() {
+		return log;
+	}
 
-  public CopycatServer createServer() {
-    return CopycatServer.builder()
-    		.withMemberId(memberId)
-    		.withMembers(members())
-            .withTransport(NettyTransport.builder()
-            		.withThreads(5)
-                    .build())
-                  .withLog(Log.builder()
-                    .withStorageLevel(StorageLevel.MEMORY)
-                    .build())
+	public void setLog(String log) {
+		this.log = log;
+	}
+	
+	public static class HostAndPort {
+		private String host;
+		  private int port;
+		  
+		  public String getHost() {
+			return host;
+		}
+		public void setHost(String host) {
+			this.host = host;
+		}
+		public int getPort() {
+			return port;
+		}
+		public void setPort(int port) {
+			this.port = port;
+		}
+	}
+
+  public CopycatServer createServer(Supplier<StateMachine> stateMachineSupplier) {
+	  
+	  Transport transport = new NettyTransport(5);
+	  File logs = new File(log);
+	  logs.mkdirs();
+	  Storage storage = Storage.builder().withDirectory(logs).build();
+	  
+    return CopycatServer.builder(new Address(address.getHost(), address.getPort()), members())
+            .withTransport(transport)
+            .withStorage(storage)
+            .withStateMachine(stateMachineSupplier.get())
     		.build();
   }
 
-  public Members members() {
-    Members.Builder builder = Members.builder();
-    members
-        .stream()
-        .map(
-            m -> Member.builder().withId(m.getId()).withHost(m.getHost()).withPort(m.getPort())
-                .build()).forEach(builder::addMember);
-    return builder.build();
+  public Address[] members() {
+	return members.stream()
+			.map(address->new Address(address.getHost(), address.getPort()))
+			.toArray(size->new Address[size]);
+
 
   }
+  
 }

@@ -15,6 +15,8 @@
  */
 package com.xiantrimble.dropwizard.copycat.example;
 
+import javax.inject.Singleton;
+
 import com.google.inject.AbstractModule;
 
 public class CopycatExampleModule extends AbstractModule {

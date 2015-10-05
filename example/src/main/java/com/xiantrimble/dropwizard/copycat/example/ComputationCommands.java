@@ -15,44 +15,37 @@
  */
 package com.xiantrimble.dropwizard.copycat.example;
 
-import net.kuujo.copycat.io.BufferInput;
-import net.kuujo.copycat.io.BufferOutput;
-import net.kuujo.copycat.io.serializer.CopycatSerializable;
-import net.kuujo.copycat.io.serializer.Serializer;
-import net.kuujo.copycat.raft.Command;
-import net.kuujo.copycat.util.BuilderPool;
+import io.atomix.catalyst.buffer.BufferInput;
+import io.atomix.catalyst.buffer.BufferOutput;
+import io.atomix.catalyst.serializer.CatalystSerializable;
+import io.atomix.catalyst.serializer.Serializer;
+import io.atomix.copycat.client.Command;
 
 public class ComputationCommands {
   /**
    * Base for computation commands.
    */
-  public static abstract class ComputationCommand<V> implements Command<V>, CopycatSerializable {
+  public static abstract class ComputationCommand<V> implements Command<V>, CatalystSerializable {
 
-    /**
-     * Base map command builder.
-     */
-    public static abstract class Builder<T extends Builder<T, U, V>, U extends ComputationCommand<V>, V>
-        extends Command.Builder<T, U, V> {
-      protected Builder(BuilderPool<T, U> pool) {
-        super(pool);
-      }
-    }
+	private static final long serialVersionUID = 1L;
   }
 
   public static abstract class SegmentCommand<V> extends ComputationCommand<V> {
-    protected long index;
+
+	private static final long serialVersionUID = 1L;
+	protected long index;
 
     public long getIndex() {
       return index;
     }
 
     @Override
-    public void writeObject(BufferOutput buffer, Serializer serializer) {
+    public void writeObject(@SuppressWarnings("rawtypes") BufferOutput buffer, Serializer serializer) {
       buffer.writeLong(index);
     }
 
-    @Override
-    public void readObject(BufferInput buffer, Serializer serializer) {
+	@Override
+    public void readObject(@SuppressWarnings("rawtypes") BufferInput buffer, Serializer serializer) {
       index = buffer.readLong();
     }
   }

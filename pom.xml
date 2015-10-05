@@ -39,7 +39,8 @@
     <maven.compiler.source>1.8</maven.compiler.source>
     <maven.compiler.target>1.8</maven.compiler.target>
     <io.dropwizard.version>0.8.1</io.dropwizard.version>
-    <copycat.version>0.6.0-SNAPSHOT</copycat.version>
+    <copycat.version>1.0.0-beta4</copycat.version>
+    <catalyst.version>1.0.0-rc4</catalyst.version>
   </properties>
 
   <repositories>
@@ -240,4 +241,21 @@
     <module>bundle</module>
     <module>example</module>
   </modules>
+  <profiles>
+    <profile>
+      <id>jsonschema</id>
+      <activation><file><exists>src/main/jsonschema</exists></file></activation>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.jsonschema2pojo</groupId>
+            <artifactId>jsonschema2pojo-maven-plugin</artifactId>
+            <configuration>
+              <sourceDirectory>${basedir}/src/main/jsonschema</sourceDirectory>
+            </configuration>
+            </plugin>
+        </plugins>
+      </build>
+    </profile>
+  </profiles>
 </project>
