@@ -6,7 +6,7 @@ A Copycat Dropwizard bundle and example application.
 
 ## Project Status
 
-This project is not yet functional, nor is it intended from projection use.
+This project is not yet functional, nor is it intended for projection use.
 
 ## Project Layout
 
