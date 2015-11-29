@@ -15,16 +15,9 @@
  */
 package com.xiantrimble.dropwizard.copycat;
 
-import java.io.File;
 import java.util.List;
-import java.util.function.Supplier;
 
 import io.atomix.catalyst.transport.Address;
-import io.atomix.catalyst.transport.NettyTransport;
-import io.atomix.catalyst.transport.Transport;
-import io.atomix.copycat.server.CopycatServer;
-import io.atomix.copycat.server.StateMachine;
-import io.atomix.copycat.server.storage.Storage;
 
 public class CopycatConfiguration {
 protected HostAndPort address;
@@ -73,20 +66,6 @@ protected HostAndPort address;
 		}
 	}
 
-  public CopycatServer createServer(Supplier<StateMachine> stateMachineSupplier) {
-	  
-	  Transport transport = new NettyTransport(5);
-	  File logs = new File(log);
-	  logs.mkdirs();
-	  Storage storage = Storage.builder().withDirectory(logs).build();
-	  
-    return CopycatServer.builder(new Address(address.getHost(), address.getPort()), members())
-            .withTransport(transport)
-            .withStorage(storage)
-            .withStateMachine(stateMachineSupplier.get())
-    		.build();
-  }
-
   public Address[] members() {
 	return members.stream()
 			.map(address->new Address(address.getHost(), address.getPort()))
@@ -94,5 +73,8 @@ protected HostAndPort address;
 
 
   }
-  
+
+  public Address address() {
+	return new Address(address.getHost(), address.getPort());
+  }
 }

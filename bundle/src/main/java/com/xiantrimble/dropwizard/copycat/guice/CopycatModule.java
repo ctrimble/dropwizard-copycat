@@ -19,13 +19,19 @@ import com.xiantrimble.dropwizard.copycat.CopycatBundle;
 
 import java.util.function.Supplier;
 
+import javax.inject.Singleton;
+
 import com.google.inject.AbstractModule;
+import com.google.inject.PrivateModule;
 import com.google.inject.Provides;
+import com.google.inject.TypeLiteral;
 
 import io.dropwizard.Configuration;
+import io.atomix.copycat.client.CopycatClient;
 import io.atomix.copycat.server.CopycatServer;
+import io.atomix.copycat.server.StateMachine;
 
-public class CopycatModule extends AbstractModule {
+public class CopycatModule extends PrivateModule {
 
   private CopycatBundle<? extends Configuration> bundle;
 
@@ -35,11 +41,26 @@ public class CopycatModule extends AbstractModule {
 
   @Override
   protected void configure() {
+	  expose(new TypeLiteral<Supplier<CopycatServer>>(){});
+	  expose(CopycatClient.class);
   }
   
   @Provides
-  public Supplier<CopycatServer> server() {
-	  return bundle::getServer;
+  @Singleton
+  public CopycatServer server(Supplier<StateMachine> stateMachineSupplier) {
+	  return bundle.createServer(stateMachineSupplier);
+  }
+  
+  @Provides
+  @Singleton
+  public Supplier<CopycatServer> server(CopycatServer server) {
+	  return ()->server;
+  }
+  
+  @Provides
+  @Singleton
+  public CopycatClient client() {
+	  return bundle.getClient();
   }
 
 }

@@ -39,8 +39,9 @@
     <maven.compiler.source>1.8</maven.compiler.source>
     <maven.compiler.target>1.8</maven.compiler.target>
     <io.dropwizard.version>0.8.1</io.dropwizard.version>
-    <copycat.version>1.0.0-beta4</copycat.version>
-    <catalyst.version>1.0.0-rc4</catalyst.version>
+    <copycat.version>1.0.0-rc4</copycat.version>
+    <catalyst.version>1.0.4</catalyst.version>
+    <jackson.version>2.7.0-rc1</jackson.version>
   </properties>
 
   <repositories>
@@ -238,6 +239,7 @@
     </plugins>
   </build>
   <modules>
+    <module>jackson</module>
     <module>bundle</module>
     <module>example</module>
   </modules>
@@ -252,6 +254,22 @@
             <artifactId>jsonschema2pojo-maven-plugin</artifactId>
             <configuration>
               <sourceDirectory>${basedir}/src/main/jsonschema</sourceDirectory>
+            </configuration>
+            </plugin>
+        </plugins>
+      </build>
+    </profile>
+    <profile>
+      <id>jsonschema-test</id>
+      <activation><file><exists>src/test/jsonschema</exists></file></activation>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.jsonschema2pojo</groupId>
+            <artifactId>jsonschema2pojo-maven-plugin</artifactId>
+            <configuration>
+              <sourceDirectory>${basedir}/src/test/jsonschema</sourceDirectory>
+              <outputDirectory>${project.build.directory}/generated-test-sources/jsonschema</outputDirectory>
             </configuration>
             </plugin>
         </plugins>
