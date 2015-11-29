@@ -15,16 +15,25 @@
  */
 package com.xiantrimble.dropwizard.copycat;
 
+import java.io.File;
 import java.util.function.Function;
 import java.util.function.Supplier;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import io.dropwizard.Configuration;
 import io.dropwizard.ConfiguredBundle;
 import io.dropwizard.lifecycle.Managed;
 import io.dropwizard.setup.Bootstrap;
 import io.dropwizard.setup.Environment;
+import io.atomix.catalyst.transport.Address;
+import io.atomix.catalyst.transport.NettyTransport;
+import io.atomix.catalyst.transport.Transport;
+import io.atomix.copycat.client.CopycatClient;
 import io.atomix.copycat.server.CopycatServer;
 import io.atomix.copycat.server.StateMachine;
+import io.atomix.copycat.server.storage.Storage;
+import io.atomix.catalyst.serializer.Serializer;
 
 public class CopycatBundle<C extends Configuration> implements ConfiguredBundle<C> {
 
@@ -54,7 +63,10 @@ public class CopycatBundle<C extends Configuration> implements ConfiguredBundle<
   private Function<C, CopycatConfiguration> configurationAccessor;
   private CopycatConfiguration configuration;
   CopycatServer server;
+  CopycatClient client;
   private Supplier<StateMachine> stateMachineSupplier;
+  private ObjectMapper mapper;
+  private Serializer serializer;
 
   public CopycatBundle(Function<C, CopycatConfiguration> configurationAccessor, Supplier<StateMachine> stateMachineSupplier) {
 	this.configurationAccessor = configurationAccessor;
@@ -73,13 +85,20 @@ public class CopycatBundle<C extends Configuration> implements ConfiguredBundle<
     if( configuration == null ) {
     	throw new NullPointerException("configuration cannot be null.");
     }
-    server = configuration.createServer(stateMachineSupplier);
-    System.out.println("Managing server");
-    environment.lifecycle().manage(new CopycatServerManager());
+    if( stateMachineSupplier != null ) {
+      server = createServer(stateMachineSupplier);
+      environment.lifecycle().manage(new CopycatServerManager());
+    }
+    client = createClient();
+    environment.lifecycle().manage(new CopycatClientManager());
   }
 
   public CopycatServer getServer() {
     return server;
+  }
+  
+  public CopycatClient getClient() {
+	  return client;
   }
 
   public static <C extends Configuration> Builder<C> builder() {
@@ -100,8 +119,50 @@ public class CopycatBundle<C extends Configuration> implements ConfiguredBundle<
 		if( server != null ) {
 			server.close().get();
 		}
-	}
+	} 
+  }
+  
+  public class JacksonSerializer extends Serializer {
 	  
+  }
+  
+  public class CopycatClientManager implements Managed {
+
+		@Override
+		public void start() throws Exception {
+			System.out.println("starting copycat client");
+			client.open().join();
+		}
+
+		@Override
+		public void stop() throws Exception {
+			System.out.println("stopping copycat client");
+			if( client != null ) {
+				client.close().join();
+			}
+		} 	  
+  }
+
+  public CopycatServer createServer(Supplier<StateMachine> stateMachineSupplier) {
+	Transport transport = new NettyTransport(5);
+	File logs = new File(configuration.getLog());
+	logs.mkdirs();
+	Storage storage = Storage.builder().withDirectory(logs).build();
+	  
+    return CopycatServer.builder(new Address(configuration.getAddress().getHost(), configuration.getAddress().getPort()), configuration.members())
+            .withTransport(transport)
+            .withStorage(storage)
+            .withStateMachine(stateMachineSupplier.get())
+            .withSerializer(serializer)
+    		.build();
+  }
+
+  public CopycatClient createClient() {
+	CopycatClient client = CopycatClient.builder(configuration.address())
+			.withTransport(new NettyTransport(5))
+			.build();
+	
+	return client;
   }
 
 }

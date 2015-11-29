@@ -2,14 +2,11 @@ package com.xiantrimble.dropwizard.copycat;
 
 import java.io.File;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
@@ -19,7 +16,6 @@ import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import org.apache.commons.io.FileUtils;
-import org.eclipse.jetty.server.Server;
 import org.junit.rules.TestRule;
 import org.junit.runner.Description;
 import org.junit.runners.model.Statement;
@@ -92,70 +88,70 @@ public class CopycatClusterRule<S extends StateMachine> implements TestRule {
 			public void evaluate() throws Throwable {
 				try {
 					long endTime = System.currentTimeMillis() + timeoutUnit.toMillis(timeout);
-					
+
 					File storageDir = new File(storagePath);
 					storageDir.mkdirs();
 					FileUtils.cleanDirectory(storageDir);
-					
+
 					storageDirList = IntStream.range(0, serverCount)
 							.mapToObj(CopycatClusterRule.this::storageDirForIndex)
 							.collect(Collectors.toList());
-					
-				addressList = 
-						IntStream.range(0, serverCount)
-						.mapToObj(CopycatClusterRule.this::addressForIndex)
-						.collect(Collectors.toList());
-				
-				servers = IntStream.range(0, serverCount)
-						.mapToObj(CopycatClusterRule.this::serverForIndex)
-						.collect(Collectors.toList());
-				
-				clients = IntStream.range(0, clientCount)
-						.mapToObj((index)->CopycatClient.builder(addressList)
-								.withTransport(new NettyTransport(5)).build())
-						.collect(Collectors.toList());
-				
-				// start the cluster.
-				CopyOnWriteArrayList<Throwable> failures = Lists.newCopyOnWriteArrayList();
-				CountDownLatch serverLatch = new CountDownLatch(serverCount);
-				servers.stream()
-				  .forEach(c->{
-					  c.open().whenCompleteAsync((c2, e)->{
-						  if( e != null ) failures.add(e);
-						  serverLatch.countDown();
-					  });
-				  });
-                serverLatch.await(endTime - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
-                
-                if( !failures.isEmpty() ) {
-                	throw new RuntimeException("failed to start servers", failures.get(0));
-                }
-                
-				CountDownLatch clientLatch = new CountDownLatch(clientCount);
-				clients.stream()
-				  .forEach(c->{
-					  c.open().whenCompleteAsync((c2, e)->{
-						  if( e != null ) failures.add(e);
-						  clientLatch.countDown();
-					  });
-				  });
-                clientLatch.await(endTime - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
 
-        		leaderRef.set(servers.stream()
-        				  .filter(CopycatServer::isOpen)
-        				  .filter(server->server.state()==State.LEADER)
-        				  .findFirst()
-        				  .orElseThrow(RuntimeException::new));
-        		
-				stateChangeListeners = servers.stream()
-						.map(s->s.onStateChange(stateChange(s)))
-						.collect(Collectors.toList());
-                
-                if( !failures.isEmpty() ) {
-                	throw new RuntimeException("failed to start clients", failures.get(0));
-                }
+					addressList = 
+							IntStream.range(0, serverCount)
+							.mapToObj(CopycatClusterRule.this::addressForIndex)
+							.collect(Collectors.toList());
 
-				base.evaluate();
+					servers = IntStream.range(0, serverCount)
+							.mapToObj(CopycatClusterRule.this::serverForIndex)
+							.collect(Collectors.toList());
+
+					clients = IntStream.range(0, clientCount)
+							.mapToObj((index)->CopycatClient.builder(addressList)
+									.withTransport(new NettyTransport(5)).build())
+							.collect(Collectors.toList());
+
+					// start the cluster.
+					CopyOnWriteArrayList<Throwable> failures = Lists.newCopyOnWriteArrayList();
+					CountDownLatch serverLatch = new CountDownLatch(serverCount);
+					servers.stream()
+					.forEach(c->{
+						c.open().whenCompleteAsync((c2, e)->{
+							if( e != null ) failures.add(e);
+							serverLatch.countDown();
+						});
+					});
+					serverLatch.await(endTime - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
+
+					if( !failures.isEmpty() ) {
+						throw new RuntimeException("failed to start servers", failures.get(0));
+					}
+
+					CountDownLatch clientLatch = new CountDownLatch(clientCount);
+					clients.stream()
+					.forEach(c->{
+						c.open().whenCompleteAsync((c2, e)->{
+							if( e != null ) failures.add(e);
+							clientLatch.countDown();
+						});
+					});
+					clientLatch.await(endTime - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
+
+					leaderRef.set(servers.stream()
+							.filter(CopycatServer::isOpen)
+							.filter(server->server.state()==State.LEADER)
+							.findFirst()
+							.orElseThrow(RuntimeException::new));
+
+					stateChangeListeners = servers.stream()
+							.map(s->s.onStateChange(stateChange(s)))
+							.collect(Collectors.toList());
+
+					if( !failures.isEmpty() ) {
+						throw new RuntimeException("failed to start clients", failures.get(0));
+					}
+
+					base.evaluate();
 				}
 				finally {
 					long endTime = System.currentTimeMillis() + timeoutUnit.toMillis(timeout);

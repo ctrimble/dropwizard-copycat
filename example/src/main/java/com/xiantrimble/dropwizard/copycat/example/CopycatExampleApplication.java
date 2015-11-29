@@ -73,8 +73,6 @@ public class CopycatExampleApplication extends Application<CopycatExampleConfigu
     
     super.initialize(bootstrap);
   }
-  
-  
 
   @Override
   public void run(CopycatExampleConfiguration configuration, Environment environment)
@@ -90,7 +88,6 @@ public class CopycatExampleApplication extends Application<CopycatExampleConfigu
 		@Override
 		public void start() throws Exception {
 			System.out.println("starting computation");
-			//computation = copycat.get()..create("/computation", Computation.class).get();
 		}
 
 		@Override
