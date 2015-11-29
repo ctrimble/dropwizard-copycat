@@ -15,14 +15,32 @@
  */
 package com.xiantrimble.dropwizard.copycat.example;
 
+import java.util.function.Supplier;
+
 import javax.inject.Singleton;
 
 import com.google.inject.AbstractModule;
+import com.google.inject.Provides;
+import com.google.inject.TypeLiteral;
+
+import io.atomix.copycat.server.StateMachine;
 
 public class CopycatExampleModule extends AbstractModule {
 
   @Override
   protected void configure() {
+  }
+  
+  @Provides
+  @Singleton
+  public Supplier<ExampleStateMachine> providesStateMachineSupplier() {
+	  return ExampleStateMachine::new;
+  }
+  
+  @Provides
+  @Singleton
+  public Supplier<StateMachine> providesStateMachine( Supplier<ExampleStateMachine> supplier ) {
+	  return supplier::get;
   }
 
 }
