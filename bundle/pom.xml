@@ -29,6 +29,21 @@
   <name>Dropwizard Copycat Bundle</name>
   <dependencies>
       <dependency>
+     <groupId>com.xiantrimble.dropwizard.copycat</groupId>
+    <artifactId>jackson-dataformat-catalyst</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+      </dependency>
+      <dependency>
+        <groupId>com.fasterxml.jackson.dataformat</groupId>
+        <artifactId>jackson-dataformat-smile</artifactId>
+        <version>${jackson.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.fasterxml.jackson.core</groupId>
+        <artifactId>jackson-annotations</artifactId>
+        <version>${jackson.version}</version>
+      </dependency>
+      <dependency>
         <groupId>io.dropwizard</groupId>
         <artifactId>dropwizard-configuration</artifactId>
       </dependency>
@@ -62,8 +77,17 @@
         <artifactId>catalyst-netty</artifactId>
         <version>${catalyst.version}</version>
       </dependency>
-
-
+      <dependency>
+        <groupId>io.atomix.catalyst</groupId>
+        <artifactId>catalyst-jackson</artifactId>
+        <version>${catalyst.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.atomix.catalyst</groupId>
+        <artifactId>catalyst-local</artifactId>
+        <version>${catalyst.version}</version>
+        <scope>test</scope>
+      </dependency>
       <dependency>
     <groupId>commons-io</groupId>
     <artifactId>commons-io</artifactId>

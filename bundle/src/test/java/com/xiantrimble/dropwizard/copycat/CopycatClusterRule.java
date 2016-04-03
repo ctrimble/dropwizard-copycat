@@ -1,25 +1,20 @@
 package com.xiantrimble.dropwizard.copycat;
 
 import java.io.File;
-import java.util.ArrayList;
-import java.util.Collections;
+import java.io.IOException;
+import java.io.Serializable;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
-import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
-import java.util.stream.Stream;
 
 import org.apache.commons.io.FileUtils;
-import org.eclipse.jetty.server.Server;
 import org.junit.rules.TestRule;
 import org.junit.runner.Description;
 import org.junit.runners.model.Statement;
@@ -28,62 +23,232 @@ import org.slf4j.LoggerFactory;
 
 import com.google.common.collect.Lists;
 
+import io.atomix.catalyst.serializer.Serializer;
 import io.atomix.catalyst.transport.Address;
-import io.atomix.catalyst.transport.NettyTransport;
+import io.atomix.catalyst.transport.LocalServerRegistry;
+import io.atomix.catalyst.transport.LocalTransport;
+import io.atomix.catalyst.transport.Transport;
 import io.atomix.catalyst.util.Listener;
+import io.atomix.copycat.client.ConnectionStrategies;
 import io.atomix.copycat.client.CopycatClient;
+import io.atomix.copycat.client.RetryStrategies;
 import io.atomix.copycat.server.CopycatServer;
-import io.atomix.copycat.server.RaftServer;
-import io.atomix.copycat.server.RaftServer.State;
 import io.atomix.copycat.server.StateMachine;
+import io.atomix.copycat.server.cluster.Member;
 import io.atomix.copycat.server.storage.Storage;
+import io.atomix.copycat.server.storage.StorageLevel;
 
 public class CopycatClusterRule<S extends StateMachine> implements TestRule {
 	public static final Logger logger = LoggerFactory.getLogger(CopycatClusterRule.class);
-	private int serverCount;
-	private int clientCount;
-	private String host = "localhost";
-	private int initialPort;
-	private long timeout = 1;
-	private TimeUnit timeoutUnit = TimeUnit.MINUTES;
-	private String storagePath = "target/copycat/storage";
+	
+	public static Supplier<Storage> DEFAULT_STORAGE_SUPPLIER = ()->{
+	  return Storage.builder()
+      .withStorageLevel(StorageLevel.MEMORY)
+      .withMaxSegmentSize(1024 * 1024)
+      .withCompactionThreads(1)
+      .build();
+	};
+	
+	public static Supplier<Supplier<Transport>> DEFAULT_TRANSPORT_SUPPLIER = ()->{
+	  LocalServerRegistry registry = new LocalServerRegistry();
+	  return ()->{
+	    return new LocalTransport(registry);
+	  };
+	};
+	
+	public static class Builder<S extends StateMachine> {
+	private int serverCount = 3;
+	private int initialPort = 5000;
 	private Supplier<S> stateMachineSupplier;
-	private List<Listener<State>> stateChangeListeners = new ArrayList<>();
-	public CopycatClusterRule<S> withServerCount( int serverCount ) {
+    private Optional<Supplier<Storage>> storageSupplier = Optional.empty();
+    private Optional<Supplier<Transport>> transportSupplier = Optional.empty();
+    private Optional<Supplier<Serializer>> serializer = Optional.empty();
+    
+	public Builder<S> withServerCount( int serverCount ) {
 		this.serverCount = serverCount;
 		return this;
 	}
 	
-	public CopycatClusterRule<S> withClientCount( int clientCount ) {
-		this.clientCount = clientCount;
-		return this;
-	}
-	
-	public CopycatClusterRule<S> withInitalPort( int initialPort ) {
+	public Builder<S> withInitalPort( int initialPort ) {
 		this.initialPort = initialPort;
 		return this;
 	}
 	
-	public CopycatClusterRule<S> withStoragePath( String storagePath ) {
-		this.storagePath = storagePath;
-		return this;
+	public Builder<S> withStateMachineSupplier( Supplier<S> stateMachineSupplier ) {
+	  this.stateMachineSupplier = stateMachineSupplier;
+	  return this;
 	}
 	
-	public CopycatClusterRule<S> withTimeout( long timeout, TimeUnit timeoutUnit ) {
-		this.timeout = timeout;
-		this.timeoutUnit = timeoutUnit;
-		return this;
+	public Builder<S> with( Consumer<Builder<S>> configurator ) {
+	  configurator.accept(this);
+	  return this;
 	}
 	
-	public CopycatClusterRule<S> withStateMachine( Supplier<S> stateMachineSupplier ) {
-		this.stateMachineSupplier = stateMachineSupplier;
-		return this;
+	  public CopycatClusterRule<S> build() {
+	    return new CopycatClusterRule<S>(
+	        serverCount,
+	        initialPort,
+	        stateMachineSupplier,
+	        storageSupplier.orElse(DEFAULT_STORAGE_SUPPLIER),
+	        transportSupplier.orElse(DEFAULT_TRANSPORT_SUPPLIER.get()),
+	        serializer.orElse(Serializer::new));
+	  }
+
+    public Builder<S> withStorageSupplier(Supplier<Storage> storageSupplier) {
+      this.storageSupplier = Optional.ofNullable(storageSupplier);
+      return this;
+    }
+    
+    public Builder<S> withDirectoryStorage(String directory) {
+      try {
+        File storageDir = new File(directory);
+        storageDir.mkdirs();
+        FileUtils.cleanDirectory(storageDir);
+        AtomicInteger index = new AtomicInteger(0);
+        return withStorageSupplier(()->{
+          File replicaStorageDir = new File(storageDir, "server_"+index.getAndIncrement());
+          replicaStorageDir.mkdir();
+          try {
+              FileUtils.cleanDirectory(replicaStorageDir);
+          } catch (Exception e) {
+              throw new RuntimeException(e);
+          }
+          return new Storage(replicaStorageDir);
+      });
+        } catch ( IOException ioe ) {
+          throw new RuntimeException(ioe);
+        }
+    }
+
+    public Builder<S> withTransportSupplier(Supplier<Transport> transportSupplier) {
+      this.transportSupplier = Optional.ofNullable(transportSupplier);
+      return this;
+    }
+
+    public Builder<S> withSerializer(Supplier<Serializer> serializer) {
+      this.serializer = Optional.ofNullable(serializer);
+      return this;
+    }
 	}
 	
+	public static class TestMember implements Member, Serializable {
+    private static final long serialVersionUID = 1L;
+    private Type type;
+    private Address serverAddress;
+    private Address clientAddress;
+  
+    public TestMember() {
+    }
+  
+    public TestMember(Type type, Address serverAddress, Address clientAddress) {
+      this.type = type;
+      this.serverAddress = serverAddress;
+      this.clientAddress = clientAddress;
+    }
+  
+    @Override
+    public int id() {
+      return serverAddress.hashCode();
+    }
+  
+    @Override
+    public Address address() {
+      return serverAddress;
+    }
+  
+    @Override
+    public Address clientAddress() {
+      return clientAddress;
+    }
+  
+    @Override
+    public Address serverAddress() {
+      return serverAddress;
+    }
+  
+    @Override
+    public Type type() {
+      return type;
+    }
+  
+    @Override
+    public Listener<Type> onTypeChange(Consumer<Type> callback) {
+      return null;
+    }
+  
+    @Override
+    public Status status() {
+      return null;
+    }
+  
+    @Override
+    public Instant updated() {
+      return null;
+    }
+  
+    @Override
+    public Listener<Status> onStatusChange(Consumer<Status> callback) {
+      return null;
+    }
+  
+    @Override
+    public CompletableFuture<Void> promote() {
+      return null;
+    }
+  
+    @Override
+    public CompletableFuture<Void> promote(Type type) {
+      return null;
+    }
+  
+    @Override
+    public CompletableFuture<Void> demote() {
+      return null;
+    }
+  
+    @Override
+    public CompletableFuture<Void> demote(Type type) {
+      return null;
+    }
+  
+    @Override
+    public CompletableFuture<Void> remove() {
+      return null;
+    }
+  }
+
+  public static <S extends StateMachine> Builder<S> builder() {
+	  return new Builder<S>();
+	}
+	
+	private Supplier<S> stateMachineSupplier;
+	private int initialPort;
+	private int serverCount;
+    private Supplier<Storage> storageSupplier;
+    private Supplier<Transport> transportSupplier;
+    private Supplier<Serializer> serializerSupplier;
+	
+	public CopycatClusterRule(int serverCount, int initialPort, Supplier<S> stateMachineSupplier, Supplier<Storage> storageSupplier, Supplier<Transport> transportSupplier, Supplier<Serializer> serializerSupplier ) {
+	  this.initialPort = initialPort;
+	  this.stateMachineSupplier = stateMachineSupplier;
+	  this.storageSupplier = storageSupplier;
+	  this.transportSupplier = transportSupplier;
+	  this.serializerSupplier = serializerSupplier;
+	  this.serverCount = serverCount;
+	}
+	
+	private int port;
+	private List<Member> members = Lists.newArrayList();
 	private List<CopycatServer> servers = Lists.newArrayList();
-	private List<Address> addressList;
-	private List<File> storageDirList;
 	private List<CopycatClient> clients = Lists.newArrayList();
+	
+    public List<Member> getMembers() {
+      return members;
+    }
+    
+    public List<CopycatServer> getServers() {
+      return servers;
+    }
 	
 	@Override
 	public Statement apply(Statement base, Description description) {
@@ -91,168 +256,95 @@ public class CopycatClusterRule<S extends StateMachine> implements TestRule {
 			@Override
 			public void evaluate() throws Throwable {
 				try {
-					long endTime = System.currentTimeMillis() + timeoutUnit.toMillis(timeout);
-					
-					File storageDir = new File(storagePath);
-					storageDir.mkdirs();
-					FileUtils.cleanDirectory(storageDir);
-					
-					storageDirList = IntStream.range(0, serverCount)
-							.mapToObj(CopycatClusterRule.this::storageDirForIndex)
-							.collect(Collectors.toList());
-					
-				addressList = 
-						IntStream.range(0, serverCount)
-						.mapToObj(CopycatClusterRule.this::addressForIndex)
-						.collect(Collectors.toList());
-				
-				servers = IntStream.range(0, serverCount)
-						.mapToObj(CopycatClusterRule.this::serverForIndex)
-						.collect(Collectors.toList());
-				
-				clients = IntStream.range(0, clientCount)
-						.mapToObj((index)->CopycatClient.builder(addressList)
-								.withTransport(new NettyTransport(5)).build())
-						.collect(Collectors.toList());
-				
-				// start the cluster.
-				CopyOnWriteArrayList<Throwable> failures = Lists.newCopyOnWriteArrayList();
-				CountDownLatch serverLatch = new CountDownLatch(serverCount);
-				servers.stream()
-				  .forEach(c->{
-					  c.open().whenCompleteAsync((c2, e)->{
-						  if( e != null ) failures.add(e);
-						  serverLatch.countDown();
-					  });
-				  });
-                serverLatch.await(endTime - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
-                
-                if( !failures.isEmpty() ) {
-                	throw new RuntimeException("failed to start servers", failures.get(0));
-                }
-                
-				CountDownLatch clientLatch = new CountDownLatch(clientCount);
-				clients.stream()
-				  .forEach(c->{
-					  c.open().whenCompleteAsync((c2, e)->{
-						  if( e != null ) failures.add(e);
-						  clientLatch.countDown();
-					  });
-				  });
-                clientLatch.await(endTime - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
+				    port = initialPort;
+				    
+				    createServers(serverCount);
 
-        		leaderRef.set(servers.stream()
-        				  .filter(CopycatServer::isOpen)
-        				  .filter(server->server.state()==State.LEADER)
-        				  .findFirst()
-        				  .orElseThrow(RuntimeException::new));
-        		
-				stateChangeListeners = servers.stream()
-						.map(s->s.onStateChange(stateChange(s)))
-						.collect(Collectors.toList());
-                
-                if( !failures.isEmpty() ) {
-                	throw new RuntimeException("failed to start clients", failures.get(0));
-                }
-
-				base.evaluate();
+					base.evaluate();
 				}
 				finally {
-					long endTime = System.currentTimeMillis() + timeoutUnit.toMillis(timeout);
-					stateChangeListeners.forEach(l->l.close());
-					CopyOnWriteArrayList<Throwable> failures = Lists.newCopyOnWriteArrayList();
-					CountDownLatch latch = new CountDownLatch(serverCount+clientCount);
-					Stream.concat(servers.stream(), clients.stream())
-					  .forEach(c->{
-						  c.close().whenCompleteAsync((c2, e)->{
-							  if( e != null ) failures.add(e);
-							  latch.countDown();
-						  });
-					  });
-	                latch.await(endTime - System.currentTimeMillis(), TimeUnit.MILLISECONDS);	
+				    clients.forEach(c -> {
+				      try {
+				        c.close().join();
+				      } catch (Exception e) {
+				      }
+				    });
+				    
+				    servers.forEach(s -> {
+				      try {
+				        if (s.isRunning()) {
+				          s.kill().join();
+				          s.delete().join();
+				        }
+				      } catch (Exception e) {
+				      }
+				    });
+
+				    members.clear();
+				    port = 5000;
+                    clients.clear();
+				    servers.clear();
 				}
 			}
 		};
 	}
+	
+	  /**
+	   * Creates a set of Copycat servers.
+	   */
+	  private List<CopycatServer> createServers(int nodes) throws Throwable {
+	    CountDownLatch serverLatch = new CountDownLatch(nodes);
 
-	public CopycatServer getServer(int index) {
-		return servers.get(index);
-	}
-
-	public CopycatClient getClient(int index) {
-		return clients.get(index);
-	}
-	
-	public Address addressForIndex( int index ) {
-		return new Address(host, initialPort+index);
-	}
-	
-	public File storageDirForIndex( int index ) {
-		File storageDir = new File(storagePath);
-		File replicaStorageDir = new File(storageDir, "server_"+serverCount);
-		replicaStorageDir.mkdir();
-		try {
-			FileUtils.cleanDirectory(replicaStorageDir);
-		} catch (Exception e) {
-			throw new RuntimeException(e);
-		}
-		return replicaStorageDir;
-	}
-	
-	public CopycatServer serverForIndex(int index) {
-		return CopycatServer.builder(addressList.get(index), addressList)
-		.withStorage(new Storage(storageDirList.get(index)))
-		.withStateMachine(stateMachineSupplier.get())
-		.withTransport(new NettyTransport(5))
-		.build();
-	}
-
-	public RaftServer addServer() throws InterruptedException, ExecutionException {
-		storageDirList.add(storageDirForIndex(serverCount));
-		addressList.add(addressForIndex(serverCount));
-		CopycatServer server = serverForIndex(serverCount);
-		servers.add(server);
-		serverCount++;
-		return server.open().get();
-	}
-	
-	public AtomicReference<CopycatServer> leaderRef = new AtomicReference<>();
-	
-	Consumer<State> stateChange( CopycatServer s ) {
-		return (state)->{
-			logger.warn("State changed {}", s.toString());
-			if( state == State.LEADER ) leaderRef.set(s);
-		};
-	}
-
-	public void stopLeader(long timeout, TimeUnit timeUnit) throws InterruptedException, ExecutionException, RuntimeException {
-		CountDownLatch leaderChange = new CountDownLatch(1);
-		
-		CopycatServer currentLeader = leaderRef.get();
-		
-		List<Listener<State>> stateChangeListeners = servers.stream().map(s->s.onStateChange(state->{
-			logger.warn("LEADER CHANGE!");
-			if( state == State.LEADER && !s.equals(currentLeader)) leaderChange.countDown();
+	    for (int i = 0; i < nodes; i++) {
+	      members.add(nextMember(Member.Type.INACTIVE));
 	    }
-		)).collect(Collectors.toList());getClass();
-		
-		leaderRef.get().close().get();
-		
-		try {
-			if( !leaderChange.await(timeout, timeUnit) ) {
-				throw new RuntimeException("New leader not chosen.");
-			}
-		}
-		finally {
-			stateChangeListeners.forEach(l->l.close());
-		}
-	}
-	
-	public Optional<Address> getLeader() {
-		CopycatServer leader = leaderRef.get();
-		if( leader == null ) return Optional.empty();
-		return Optional.ofNullable(leader
-				.leader());
-	}
 
+	    for (int i = 0; i < nodes; i++) {
+	      CopycatServer server = createServer(members, members.get(i));
+	      server.start().thenRun(serverLatch::countDown);
+	    }
+
+	    serverLatch.await(30*nodes, TimeUnit.SECONDS);
+
+	    return servers;
+	  }
+	  
+	  
+	  private Member nextMember(Member.Type type) {
+	    return new CopycatClusterRule.TestMember(type, new Address("localhost", ++port), new Address("localhost", port + 1000));
+	  }
+	  
+	  private CopycatServer createServer(List<Member> members, Member member) {
+	    @SuppressWarnings("unchecked")
+      CopycatServer.Builder builder = CopycatServer.builder(member.clientAddress(), member.serverAddress(), members.stream().map(Member::serverAddress).collect(Collectors.toList()))
+	      .withTransport(transportSupplier.get())
+	      .withStorage(storageSupplier.get())
+	      .withSerializer(serializerSupplier.get())
+	      .withStateMachine((Supplier<StateMachine>)stateMachineSupplier);
+
+	    if (member.type() != Member.Type.INACTIVE) {
+	      builder.withType(member.type());
+	    }
+
+	    CopycatServer server = builder.build();
+	    server.serializer().disableWhitelist();
+	    servers.add(server);
+	    return server;
+	  }
+	  
+
+	  public CopycatClient createClient() throws InterruptedException {
+	    CopycatClient client = CopycatClient.builder(members.stream().map(Member::clientAddress).collect(Collectors.toList()))
+	        .withTransport(transportSupplier.get())
+	        .withSerializer(serializerSupplier.get())
+	        .withConnectionStrategy(ConnectionStrategies.FIBONACCI_BACKOFF)
+	        .withRetryStrategy(RetryStrategies.FIBONACCI_BACKOFF)
+	        .build();
+	      client.serializer().disableWhitelist();
+	      CountDownLatch latch = new CountDownLatch(1);
+	      client.connect().thenRun(latch::countDown);
+	      latch.await(10, TimeUnit.SECONDS);
+	      clients.add(client);
+	      return client;
+	  }
 }
