@@ -105,19 +105,11 @@ public class ObjectMapperMachine {
     private String value;
     @JsonProperty("key")
     private String key;
-    @JsonProperty("consistency")
-    private ConsistencyLevel consistency;
   
     @JsonCreator
-    public TestPut(@JsonProperty("key") String key, @JsonProperty("value") String value, @JsonProperty("consistency") ConsistencyLevel consistency) {
+    public TestPut(@JsonProperty("key") String key, @JsonProperty("value") String value) {
       this.key = key;
       this.value = value;
-      this.consistency = consistency;
-    }
-  
-    @Override
-    public ConsistencyLevel consistency() {
-      return consistency;
     }
   
     @Override

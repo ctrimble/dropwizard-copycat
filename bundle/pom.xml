@@ -28,11 +28,13 @@
   <artifactId>dropwizard-copycat</artifactId>
   <name>Dropwizard Copycat Bundle</name>
   <dependencies>
+      <!--
       <dependency>
      <groupId>com.xiantrimble.dropwizard.copycat</groupId>
     <artifactId>jackson-dataformat-catalyst</artifactId>
     <version>0.0.1-SNAPSHOT</version>
       </dependency>
+    -->
       <dependency>
         <groupId>com.fasterxml.jackson.dataformat</groupId>
         <artifactId>jackson-dataformat-smile</artifactId>

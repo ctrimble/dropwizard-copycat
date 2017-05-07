@@ -23,15 +23,16 @@ import org.slf4j.LoggerFactory;
 
 import com.google.common.collect.Lists;
 
+import io.atomix.catalyst.concurrent.Listener;
 import io.atomix.catalyst.serializer.Serializer;
 import io.atomix.catalyst.transport.Address;
-import io.atomix.catalyst.transport.LocalServerRegistry;
-import io.atomix.catalyst.transport.LocalTransport;
+import io.atomix.catalyst.transport.local.LocalServerRegistry;
+import io.atomix.catalyst.transport.local.LocalTransport;
 import io.atomix.catalyst.transport.Transport;
-import io.atomix.catalyst.util.Listener;
 import io.atomix.copycat.client.ConnectionStrategies;
 import io.atomix.copycat.client.CopycatClient;
-import io.atomix.copycat.client.RetryStrategies;
+import io.atomix.copycat.client.RecoveryStrategies;
+import io.atomix.copycat.client.RecoveryStrategy;
 import io.atomix.copycat.server.CopycatServer;
 import io.atomix.copycat.server.StateMachine;
 import io.atomix.copycat.server.cluster.Member;
@@ -273,8 +274,7 @@ public class CopycatClusterRule<S extends StateMachine> implements TestRule {
 				    servers.forEach(s -> {
 				      try {
 				        if (s.isRunning()) {
-				          s.kill().join();
-				          s.delete().join();
+				          s.leave().join();
 				        }
 				      } catch (Exception e) {
 				      }
@@ -301,7 +301,7 @@ public class CopycatClusterRule<S extends StateMachine> implements TestRule {
 
 	    for (int i = 0; i < nodes; i++) {
 	      CopycatServer server = createServer(members, members.get(i));
-	      server.start().thenRun(serverLatch::countDown);
+	      server.bootstrap(members.stream().map(Member::serverAddress).collect(Collectors.toList())).thenRun(serverLatch::countDown);
 	    }
 
 	    serverLatch.await(30*nodes, TimeUnit.SECONDS);
@@ -316,7 +316,7 @@ public class CopycatClusterRule<S extends StateMachine> implements TestRule {
 	  
 	  private CopycatServer createServer(List<Member> members, Member member) {
 	    @SuppressWarnings("unchecked")
-      CopycatServer.Builder builder = CopycatServer.builder(member.clientAddress(), member.serverAddress(), members.stream().map(Member::serverAddress).collect(Collectors.toList()))
+      CopycatServer.Builder builder = CopycatServer.builder(member.clientAddress(), member.serverAddress())
 	      .withTransport(transportSupplier.get())
 	      .withStorage(storageSupplier.get())
 	      .withSerializer(serializerSupplier.get())
@@ -327,6 +327,7 @@ public class CopycatClusterRule<S extends StateMachine> implements TestRule {
 	    }
 
 	    CopycatServer server = builder.build();
+	    //server.bootstrap(members.stream().map(Member::serverAddress).collect(Collectors.toList())).join();
 	    server.serializer().disableWhitelist();
 	    servers.add(server);
 	    return server;
@@ -338,7 +339,7 @@ public class CopycatClusterRule<S extends StateMachine> implements TestRule {
 	        .withTransport(transportSupplier.get())
 	        .withSerializer(serializerSupplier.get())
 	        .withConnectionStrategy(ConnectionStrategies.FIBONACCI_BACKOFF)
-	        .withRetryStrategy(RetryStrategies.FIBONACCI_BACKOFF)
+	        .withRecoveryStrategy(RecoveryStrategies.RECOVER)
 	        .build();
 	      client.serializer().disableWhitelist();
 	      CountDownLatch latch = new CountDownLatch(1);

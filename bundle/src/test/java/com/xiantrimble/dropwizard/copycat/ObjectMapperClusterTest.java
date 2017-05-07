@@ -27,7 +27,7 @@ import io.atomix.catalyst.serializer.SerializationException;
 import io.atomix.catalyst.serializer.Serializer;
 import io.atomix.catalyst.serializer.TypeSerializer;
 import io.atomix.catalyst.serializer.TypeSerializerFactory;
-import io.atomix.catalyst.transport.NettyTransport;
+import io.atomix.catalyst.transport.netty.NettyTransport;
 import io.atomix.copycat.Command;
 import io.atomix.copycat.Query;
 import io.atomix.copycat.client.CopycatClient;
@@ -64,7 +64,7 @@ public class ObjectMapperClusterTest {
     AtomicReference<String> valueRef = new AtomicReference<String>();
     
     CountDownLatch clientLatch = new CountDownLatch(1);
-    client.submit(new ObjectMapperMachine.TestPut("key", "value", Command.ConsistencyLevel.SEQUENTIAL))
+    client.submit(new ObjectMapperMachine.TestPut("key", "value"))
     .thenAccept(value->{
       valueRef.set(value);
       clientLatch.countDown();
@@ -81,7 +81,7 @@ public class ObjectMapperClusterTest {
     AtomicReference<String> valueRef = new AtomicReference<String>();
     
     CountDownLatch clientLatch = new CountDownLatch(1);
-    client.submit(new ObjectMapperMachine.TestPut("key", "value1", Command.ConsistencyLevel.SEQUENTIAL))
+    client.submit(new ObjectMapperMachine.TestPut("key", "value1"))
     .thenRun(()->{
       client.submit(new ObjectMapperMachine.TestGet("key", Query.ConsistencyLevel.SEQUENTIAL))
       .thenAccept(value->{

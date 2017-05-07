@@ -23,9 +23,14 @@ import java.util.function.Supplier;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.inject.Stage;
 import com.hubspot.dropwizard.guice.GuiceBundle;
 
+import io.atomix.catalyst.serializer.Serializer;
+import io.atomix.catalyst.serializer.jackson.GenericJacksonSerializer;
 import io.atomix.copycat.server.CopycatServer;
 import io.dropwizard.Application;
 import io.dropwizard.lifecycle.Managed;
@@ -60,7 +65,13 @@ public class CopycatExampleApplication extends Application<CopycatExampleConfigu
     bootstrap.addBundle(bundle =
         CopycatBundle.<CopycatExampleConfiguration> builder()
             .withConfiguration(CopycatExampleConfiguration::getCopycat)
-            .withStateMachineSupplier(ExampleStateMachine::new).build());
+            .withStateMachineSupplier(ExampleStateMachine::new)
+            .withSerializer(new Serializer()
+              .register(JsonNode.class, GenericJacksonSerializer.class)
+              .register(ObjectNode.class, GenericJacksonSerializer.class)
+              .register(ArrayNode.class, GenericJacksonSerializer.class)
+              )
+            .build());
 
     GuiceBundle.Builder<CopycatExampleConfiguration> builder =
         GuiceBundle.<CopycatExampleConfiguration> newBuilder()

@@ -13,7 +13,7 @@ import java.util.stream.Collectors;
 import org.junit.Rule;
 import org.junit.Test;
 
-import io.atomix.catalyst.transport.NettyTransport;
+import io.atomix.catalyst.transport.netty.NettyTransport;
 import io.atomix.copycat.Command;
 import io.atomix.copycat.Query;
 import io.atomix.copycat.client.CopycatClient;
@@ -49,7 +49,7 @@ public class NettyClusterTest {
     AtomicReference<String> valueRef = new AtomicReference<String>();
     
     CountDownLatch clientLatch = new CountDownLatch(1);
-    client.submit(new MapMachine.TestPut("key", "value", Command.ConsistencyLevel.SEQUENTIAL))
+    client.submit(new MapMachine.TestPut("key", "value"))
     .thenAccept(value->{
       valueRef.set(value);
       clientLatch.countDown();
@@ -66,7 +66,7 @@ public class NettyClusterTest {
     AtomicReference<String> valueRef = new AtomicReference<String>();
     
     CountDownLatch clientLatch = new CountDownLatch(1);
-    client.submit(new MapMachine.TestPut("key", "value1", Command.ConsistencyLevel.SEQUENTIAL))
+    client.submit(new MapMachine.TestPut("key", "value1"))
     .thenRun(()->{
       client.submit(new MapMachine.TestGet("key", Query.ConsistencyLevel.SEQUENTIAL))
       .thenAccept(value->{

@@ -5,6 +5,7 @@ import java.util.Map;
 
 import io.atomix.copycat.Command;
 import io.atomix.copycat.Query;
+import io.atomix.copycat.Query.ConsistencyLevel;
 import io.atomix.copycat.server.Commit;
 import io.atomix.copycat.server.Snapshottable;
 import io.atomix.copycat.server.StateMachine;
@@ -77,17 +78,10 @@ public class MapMachine {
     private static final long serialVersionUID = 1L;
     private String value;
     private String key;
-    private ConsistencyLevel consistency;
   
-    public TestPut(String key, String value, ConsistencyLevel consistency) {
+    public TestPut(String key, String value) {
       this.key = key;
       this.value = value;
-      this.consistency = consistency;
-    }
-  
-    @Override
-    public ConsistencyLevel consistency() {
-      return consistency;
     }
   
     @Override

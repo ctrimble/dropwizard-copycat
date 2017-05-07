@@ -44,7 +44,7 @@
       <dependency>
       <groupId>com.hubspot.dropwizard</groupId>
       <artifactId>dropwizard-guice</artifactId>
-      <version>0.8.1.1</version>
+      <version>1.0.6.0</version>
       <exclusions>
         <exclusion>
           <groupId>com.google.code.findbugs</groupId>
@@ -78,11 +78,16 @@
     </dependency>
   </dependencies>
   </dependencyManagement>
-  <dependencies>
+    <dependencies>
       <dependency>
         <groupId>com.xiantrimble.dropwizard.copycat</groupId>
         <artifactId>dropwizard-copycat</artifactId>
         <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.atomix.catalyst</groupId>
+        <artifactId>catalyst-jackson</artifactId>
+        <version>${catalyst.version}</version>
       </dependency>
       <dependency>
         <groupId>io.dropwizard</groupId>

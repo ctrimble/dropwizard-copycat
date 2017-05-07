@@ -22,8 +22,8 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.xiantrimble.jackson.catalyst.CatalystInputStream;
-import com.xiantrimble.jackson.catalyst.CatalystOutputStream;
+//import com.xiantrimble.jackson.catalyst.CatalystInputStream;
+//import com.xiantrimble.jackson.catalyst.CatalystOutputStream;
 
 import io.dropwizard.Configuration;
 import io.dropwizard.ConfiguredBundle;
@@ -31,7 +31,7 @@ import io.dropwizard.lifecycle.Managed;
 import io.dropwizard.setup.Bootstrap;
 import io.dropwizard.setup.Environment;
 import io.atomix.catalyst.transport.Address;
-import io.atomix.catalyst.transport.NettyTransport;
+import io.atomix.catalyst.transport.netty.NettyTransport;
 import io.atomix.catalyst.transport.Transport;
 import io.atomix.copycat.client.CopycatClient;
 import io.atomix.copycat.server.CopycatServer;
@@ -77,6 +77,7 @@ public class CopycatBundle<C extends Configuration> implements ConfiguredBundle<
     }
   }
   
+  /*
   public static <T> TypeSerializer<T> objectMapperSerializer(ObjectMapper mapper) {
 	  return new TypeSerializer<T>() {
 
@@ -100,6 +101,7 @@ public class CopycatBundle<C extends Configuration> implements ConfiguredBundle<
 
 	};
   }
+  */
 
   private Function<C, CopycatConfiguration> configurationAccessor;
   private CopycatConfiguration configuration;
@@ -152,14 +154,14 @@ public class CopycatBundle<C extends Configuration> implements ConfiguredBundle<
 	@Override
 	public void start() throws Exception {
 		System.out.println("starting copycat");
-		server.start().get();
+		server.bootstrap(configuration.members()).get();
 	}
 
 	@Override
 	public void stop() throws Exception {
 		System.out.println("stopping copycat");
 		if( server != null ) {
-			server.stop().get();
+			server.leave().get();
 		}
 	} 
   }
@@ -191,7 +193,7 @@ public class CopycatBundle<C extends Configuration> implements ConfiguredBundle<
 	logs.mkdirs();
 	Storage storage = Storage.builder().withDirectory(logs).build();
 	  
-    CopycatServer.Builder builder = CopycatServer.builder(new Address(configuration.getAddress().getHost(), configuration.getAddress().getPort()), configuration.members())
+    CopycatServer.Builder builder = CopycatServer.builder(new Address(configuration.getAddress().getHost(), configuration.getAddress().getPort()))
             .withTransport(transport)
             .withStorage(storage)
             .withStateMachine(stateMachineSupplier);

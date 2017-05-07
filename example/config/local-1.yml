@@ -12,7 +12,6 @@ server:
   adminConnectors:
   - type: http
     port: 8181
-  shutdownGracePeriod: 2s
 
 copycat:
   address:
