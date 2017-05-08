@@ -6,7 +6,7 @@ A Copycat Dropwizard bundle and example application.
 
 ## Project Status
 
-This project is not yet functional, nor is it intended for projection use.
+This project is functional, but is not currently being used in production.
 
 ## Project Layout
 
@@ -14,13 +14,9 @@ This project is not yet functional, nor is it intended for projection use.
 - `/bundle` A bundle implementation that provides support for Copycat.
 - `/example` A simple example, showing how to use this bundle.
 
-## Before you Build
-
-This project requires [Copycat 0.6.0](https://github.com/kuujo/copycat).  You should check this version out locally and build it, before building this project.
-
 ## Build
 
-This project builds with Maven 3.1.X or later.  Make sure you have Maven installed before building.
+This project builds with Maven 3.3.9 or later.  Make sure you have Maven installed before building.
 
 To build, clone the repo and run the `install` goal.
 
